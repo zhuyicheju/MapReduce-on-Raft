@@ -20,7 +20,7 @@ package raft
 import (
 	//	"bytes"
 
-	"bytes"
+	"fmt"
 	"math/rand"
 	"net/rpc"
 	"sync"
@@ -58,6 +58,7 @@ type Raft struct {
 	mu sync.Mutex // Lock to protect shared access to this peer's state
 	//peers     []*labrpc.ClientEnd // RPC end points of all peers
 	peers     []string
+	client    []*rpc.Client
 	persister *Persister // Object to hold this peer's persisted state
 	me        int        // this peer's index into peers[]
 	dead      int32      // set by Kill()
@@ -150,43 +151,45 @@ func (rf *Raft) GetState() (int, bool) {
 }
 
 func (rf *Raft) persist() {
-	w := new(bytes.Buffer)
-	e := labgob.NewEncoder(w)
-	e.Encode(rf.currentTerm)
-	e.Encode(rf.votedFor)
-	e.Encode(rf.snapshotIndex)
-	e.Encode(rf.snapshotTerm)
-	e.Encode(rf.log)
-	raftstate := w.Bytes()
-	rf.persister.Save(raftstate, rf.snapshot)
+	return
+	// w := new(bytes.Buffer)
+	// e := labgob.NewEncoder(w)
+	// e.Encode(rf.currentTerm)
+	// e.Encode(rf.votedFor)
+	// e.Encode(rf.snapshotIndex)
+	// e.Encode(rf.snapshotTerm)
+	// e.Encode(rf.log)
+	// raftstate := w.Bytes()
+	// rf.persister.Save(raftstate, rf.snapshot)
 }
 
 // restore previously persisted state.
 func (rf *Raft) readPersist(data []byte) {
-	if data == nil || len(data) < 1 { // bootstrap without any state?
-		return
-	}
-	r := bytes.NewBuffer(data)
-	d := labgob.NewDecoder(r)
-	var currentTerm int
-	var votedFor int
-	var snapshotIndex int
-	var snapshotTerm int
-	var log []LogEntry
-	if d.Decode(&currentTerm) != nil ||
-		d.Decode(&votedFor) != nil ||
-		d.Decode(&snapshotIndex) != nil ||
-		d.Decode(&snapshotTerm) != nil ||
-		d.Decode(&log) != nil {
-		panic("持久化状态解码错误")
-	}
+	return
+	// if data == nil || len(data) < 1 { // bootstrap without any state?
+	// 	return
+	// }
+	// r := bytes.NewBuffer(data)
+	// d := labgob.NewDecoder(r)
+	// var currentTerm int
+	// var votedFor int
+	// var snapshotIndex int
+	// var snapshotTerm int
+	// var log []LogEntry
+	// if d.Decode(&currentTerm) != nil ||
+	// 	d.Decode(&votedFor) != nil ||
+	// 	d.Decode(&snapshotIndex) != nil ||
+	// 	d.Decode(&snapshotTerm) != nil ||
+	// 	d.Decode(&log) != nil {
+	// 	panic("持久化状态解码错误")
+	// }
 
-	rf.currentTerm = currentTerm
-	rf.votedFor = votedFor
-	rf.snapshotIndex = snapshotIndex
-	rf.commitIndex = snapshotIndex
-	rf.log = log
-	rf.snapshotTerm = snapshotTerm
+	// rf.currentTerm = currentTerm
+	// rf.votedFor = votedFor
+	// rf.snapshotIndex = snapshotIndex
+	// rf.commitIndex = snapshotIndex
+	// rf.log = log
+	// rf.snapshotTerm = snapshotTerm
 }
 
 // 日志总长度，不包括空索引
@@ -224,6 +227,7 @@ func (rf *Raft) TermIndex(index int) int {
 }
 
 func (rf *Raft) Snapshot(index int, snapshot []byte) {
+	return
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 	if index <= rf.snapshotIndex {
@@ -260,14 +264,14 @@ func (rf *Raft) ParallelCommit(index int, log []LogEntry) {
 	}
 }
 
-func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply) {
+func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply) error {
 	if rf.killed() {
-		return
+		return nil
 	}
 
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
-	// fmt.Printf("Serve %v: AppendEntries log %v commit %v\n", rf.me, rf.FakeIdx2TrueIdx(len(rf.log)-1), rf.commitIndex)
+	fmt.Printf("Server %v: AppendEntries \n", rf.me)
 	currentTerm := rf.currentTerm
 	reply.Term = currentTerm
 	reply.Me = rf.me
@@ -279,7 +283,7 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 		reply.Success = false
 		// fmt.Printf("Serve %v: 任期过低AppendEntries log %v commit %v\n", rf.me, rf.FakeIdx2TrueIdx(len(rf.log)-1), rf.commitIndex)
 
-		return
+		return nil
 	}
 	rf.heartbeat_timestamp = time.Now().UnixMilli()
 	if args.Term > rf.currentTerm {
@@ -313,7 +317,7 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 			reply.ConflictIndex = rf.FakeIdx2TrueIdx(r) // 第一=term的下标
 		}
 		reply.Success = false
-		return
+		return nil
 	}
 
 	for i := range args.Entries {
@@ -340,12 +344,12 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 		rf.commitIndex = min(args.LeaderCommit, rf.FakeIdx2TrueIdx(len(rf.log)-1))
 	}
 	// fmt.Printf("Serve %v: 成功AppendEntries log %v commit %v\n", rf.me, rf.FakeIdx2TrueIdx(len(rf.log)-1), rf.commitIndex)
-
+	return nil
 }
 
-func (rf *Raft) InstallSnapshot(args *InstallSnapshotArgs, reply *InstallSnapshotReply) {
+func (rf *Raft) InstallSnapshot(args *InstallSnapshotArgs, reply *InstallSnapshotReply) error {
 	if rf.killed() {
-		return
+		return nil
 	}
 
 	// fmt.Printf("Server %v: 尝试锁installsnapshot\n", rf.me)
@@ -356,7 +360,7 @@ func (rf *Raft) InstallSnapshot(args *InstallSnapshotArgs, reply *InstallSnapsho
 	if args.Term < rf.currentTerm || args.LastIncludedIndex <= rf.commitIndex {
 		rf.mu.Unlock()
 		reply.Success = false
-		return
+		return nil
 	}
 
 	reply.Success = true
@@ -384,11 +388,12 @@ func (rf *Raft) InstallSnapshot(args *InstallSnapshotArgs, reply *InstallSnapsho
 	rf.mu.Unlock()
 	//在无锁调用
 	// rf.Snapshot(args.LastIncludedIndex, args.Data)
+	return nil
 }
 
-func (rf *Raft) PreRequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
+func (rf *Raft) PreRequestVote(args *RequestVoteArgs, reply *RequestVoteReply) error {
 	if rf.killed() {
-		return
+		return nil
 	}
 
 	rf.mu.Lock()
@@ -401,24 +406,25 @@ func (rf *Raft) PreRequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 		(args.LastLogTerm == rf.LastLogTerm() && rf.TrueIdx2FakeIdx(args.LastLogIndex) < len(rf.log)-1) {
 		// fmt.Printf("Serve %v: RequestVote %v %v %v %v %v\n", rf.me, args.CandidatedId, args.Term, rf.currentTerm, reply.VoteGranted, rf.votedFor)
 		reply.VoteGranted = false
-		return
+		return nil
 	}
 
 	rf.heartbeat_timestamp = time.Now().UnixMilli()
 	reply.VoteGranted = true
 	// fmt.Printf("Serve %v: RequestVote %v %v %v %v %v\n", rf.me, args.CandidatedId, args.Term, rf.currentTerm, reply.VoteGranted, rf.votedFor)
-
+	return nil
 }
 
-func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
-
+func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) error {
 	if rf.killed() {
-		return
+		return nil
 	}
 
 	rf.mu.Lock()
 
 	defer rf.mu.Unlock()
+
+	fmt.Printf("Serve %v: RequestVote\n", rf.me)
 
 	reply.Term = rf.currentTerm
 
@@ -434,13 +440,14 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 
 		// fmt.Printf("Serve %v: RequestVote %v %v %v %v %v\n", rf.me, args.CandidatedId, args.Term, rf.currentTerm, reply.VoteGranted, rf.votedFor)
 		reply.VoteGranted = false
-		return
+		return nil
 	}
 
 	rf.heartbeat_timestamp = time.Now().UnixMilli()
 	reply.VoteGranted = true
 	rf.ChangeState(rf.currentTerm, args.CandidatedId, FOLLOWER)
-	// fmt.Printf("Serve %v: RequestVote %v %v %v %v %v\n", rf.me, args.CandidatedId, args.Term, rf.currentTerm, reply.VoteGranted, rf.votedFor)
+	//fmt.Printf("Serve %v: RequestVote %v %v %v %v %v\n", rf.me, args.CandidatedId, args.Term, rf.currentTerm, reply.VoteGranted, rf.votedFor)
+	return nil
 }
 
 func (rf *Raft) ReceiveReply(stop chan struct{}, entries_replyCh chan *AppendEntriesReply, snapshot_replyCh chan *InstallSnapshotReply, done *bool) {
@@ -624,7 +631,7 @@ func Leader(rf *Raft) {
 				}
 
 				go func(server int) {
-					// fmt.Printf("Server %v: 向%v发送心跳 prev %v len:%v commit %v\n", rf.me, server, rf.nextIndex[server]-1, len(entries), rf.commitIndex)
+					fmt.Printf("Server %v: 向%v发送心跳 prev %v len:%v commit %v\n", rf.me, server, rf.nextIndex[server]-1, len(entries), rf.commitIndex)
 					args := AppendEntriesArgs{Term: term, LeaderId: rf.me,
 						PrevLogIndex: prevlogindex, PrevLogTerm: prevlogterm,
 						LeaderCommit: leadercommit,
@@ -788,7 +795,7 @@ func Candidate(rf *Raft) {
 				continue
 			}
 
-			// fmt.Printf("Server %v: 向%v发送投票\n", rf.me, i)
+			fmt.Printf("Server %v: 向%v发送投票\n", rf.me, i)
 			go func(server int) {
 				reply := RequestVoteReply{}
 				// ok := rf.peers[server].Call("Raft.RequestVote", &args, &reply)
@@ -832,7 +839,7 @@ func Candidate(rf *Raft) {
 				if reply.VoteGranted {
 					granted_cnt++
 					if granted_cnt >= (peers_num)/2+1 {
-						// fmt.Printf("Server %v: 选举成功，进入leader\n", rf.me)
+						fmt.Printf("Server %v: 选举成功，进入leader\n", rf.me)
 						Leader(rf)
 						return //若是leader被打为follower直接return到tick
 					}
@@ -860,7 +867,7 @@ func (rf *Raft) ticker() {
 
 		rf.mu.Lock()
 		if time.Since(time.UnixMilli(rf.heartbeat_timestamp)).Milliseconds() > ms {
-			// fmt.Printf("Serve %v: 等待超时，开始选举\n", rf.me)
+			fmt.Printf("Server %v: 等待超时，开始选举\n", rf.me)
 			//超时
 			//自下向上转换不需要手动添加状态转换
 			Candidate(rf)
@@ -871,8 +878,10 @@ func (rf *Raft) ticker() {
 
 func Make(peers []string, me int,
 	persister *Persister, applyCh chan ApplyMsg) *Raft {
+	fmt.Printf("创建实例 %v\n", me)
 	rf := &Raft{}
 	rf.peers = peers
+	rf.client = make([]*rpc.Client, len(rf.peers))
 	rf.persister = persister
 	rf.me = me
 	rf.applyCh = applyCh
@@ -888,17 +897,35 @@ func Make(peers []string, me int,
 	rf.matchIndex = make([]int, len(rf.peers))
 
 	// initialize from state persisted before a crash
-	rf.readPersist(persister.ReadRaftState())
-	rf.snapshot = rf.persister.ReadSnapshot()
-
-	// start ticker goroutine to start elections
-	go rf.ticker()
+	// rf.readPersist(persister.ReadRaftState())
+	// rf.snapshot = rf.persister.ReadSnapshot()
 
 	return rf
 }
 
+func (rf *Raft) Open() {
+	for i, addr := range rf.peers {
+		if i == rf.me {
+			continue
+		}
+		client, err := rpc.Dial("tcp", addr)
+		rf.client[i] = client
+		if err != nil {
+			panic("连接失败")
+		}
+	}
+
+	// start ticker goroutine to start elections
+	go rf.ticker()
+}
 func (rf *Raft) Kill() {
 	atomic.StoreInt32(&rf.dead, 1)
+
+	rf.mu.Lock()
+	for _, client := range rf.client {
+		client.Close()
+	}
+	rf.mu.Unlock()
 }
 
 func (rf *Raft) killed() bool {
@@ -914,13 +941,9 @@ func (rf *Raft) ChangeState(term int, votefor int, state int) {
 }
 
 func RPCCall(rf *Raft, server int, name string, args interface{}, reply interface{}) bool {
-	addr := rf.peers[server]
-	client, err := rpc.Dial("tcp", addr)
-	if err != nil {
-		return false
+	if server == rf.me {
+		panic("RPC自己")
 	}
-	defer client.Close()
-
-	err = client.Call("Raft.RequestVote", args, reply)
+	err := rf.client[server].Call(name, args, reply)
 	return err == nil
 }

@@ -1,4 +1,4 @@
-package main
+package mrapp
 
 import (
 	"mr"
