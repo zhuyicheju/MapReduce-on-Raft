@@ -1,17 +1,9 @@
 package main
 
 import (
-	"fmt"
-	"log"
 	"mrrf/raft"
-	"net"
-	"net/rpc"
-	"time"
+	"sync"
 )
-
-type ApplyMsg = raft.ApplyMsg
-type Raft = raft.Raft
-type Persister = raft.Persister
 
 var IPaddr = [4]string{
 	"127.0.0.1:8000",
@@ -20,21 +12,29 @@ var IPaddr = [4]string{
 	"127.0.0.1:8003",
 }
 
-type Config struct {
-	n        int
-	rafts    []*Raft
-	applyChs []chan ApplyMsg
-	addrs    []string // TCP 地址
-	saved    []*Persister
+type config struct {
+	mu      sync.Mutex
+	n       int
+	addrs   []string
+	masters []*Master
+	saved   []*raft.Persister
+	// endnames     [][]string // names of each server's sending ClientEnds
+	// clerks       map[*Clerk][]string
+	// nextClientId int
+	// maxraftstate int
+	// start        time.Time // time at which make_config() was called
+	// // begin()/end() statistics
+	// t0    time.Time // time at which test_test.go called cfg.begin()
+	// rpcs0 int       // rpcTotal() at start of test
+	// ops   int32     // number of clerk get/put/append method calls
 }
 
-func MakeConfig(n int) *Config {
+func make_config(n int) *config {
 	cfg := &Config{}
 	cfg.n = n
-	cfg.rafts = make([]*Raft, n)
-	cfg.applyChs = make([]chan ApplyMsg, n)
 	cfg.addrs = make([]string, n)
 	cfg.saved = make([]*Persister, n)
+	cfg.masters = make([]*Master, n)
 
 	for i := 0; i < n; i++ {
 		cfg.addrs[i] = IPaddr[i]
@@ -42,7 +42,7 @@ func MakeConfig(n int) *Config {
 
 	done := make(chan bool, n)
 	for i := 0; i < n; i++ {
-		go cfg.makeRaft(i, done)
+		go cfg.makeMaster(i, done)
 	}
 	//先创建实例与监听
 
@@ -53,60 +53,17 @@ func MakeConfig(n int) *Config {
 
 	//在连接和启动
 	for i := 0; i < n; i++ {
-		go cfg.rafts[i].Open()
+		go cfg.masters[i].Open()
 	}
 
 	return cfg
 }
 
-func (cfg *Config) makeRaft(me int, done chan bool) {
-	applyCh := make(chan ApplyMsg)
-	cfg.applyChs[me] = applyCh
-
-	// if cfg.saved[me] == nil {
-	// 	cfg.saved[me] = MakePersister()
-	// } else {
-	// 	cfg.saved[me] = cfg.saved[me].Copy()
-	// }
-
-	rf := raft.Make(cfg.addrs, me, cfg.saved[me], applyCh)
-	cfg.rafts[me] = rf
-
-	// 启动 RPC 服务端
-	go func(me int) {
-		server := rpc.NewServer()
-		server.Register(rf)
-		listener, err := net.Listen("tcp", cfg.addrs[me])
-		if err != nil {
-			log.Fatalf("Raft %d listen error: %v", me, err)
-		}
-		done <- true
-		for {
-			conn, err := listener.Accept()
-			if err == nil {
-				go server.ServeConn(conn)
-			}
-		}
-	}(me)
-
-	// 启动 applyLoop
-	go func(me int, applyCh chan ApplyMsg) {
-		for msg := range applyCh {
-			log.Printf("[Raft %d] Apply: %+v", me, msg)
-		}
-	}(me, applyCh)
+func makeMaster(me int, done chan bool) {
+	master := master.MakeMaster(cfg.addrs, me, cfg.saved[me], 100, done)
+	cfg.masters[me] = master
 }
 
 func main() {
-	cfg := MakeConfig(3)
 
-	time.Sleep(3 * time.Second)
-
-	// 模拟提交一个命令到 Raft 0
-	index, term, isLeader := cfg.rafts[0].Start("hello world")
-	fmt.Printf("Index: %d, Term: %d, IsLeader: %v\n", index, term, isLeader)
-	index, term, isLeader = cfg.rafts[1].Start("hello world")
-	fmt.Printf("Index: %d, Term: %d, IsLeader: %v\n", index, term, isLeader)
-	index, term, isLeader = cfg.rafts[2].Start("hello world")
-	fmt.Printf("Index: %d, Term: %d, IsLeader: %v\n", index, term, isLeader)
 }
