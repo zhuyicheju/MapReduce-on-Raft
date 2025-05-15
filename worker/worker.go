@@ -11,6 +11,7 @@ import (
 	"os"
 	"sort"
 	"time"
+	"mrrf/rpcargs"
 )
 
 
@@ -57,7 +58,7 @@ func Worker(addr []string, mapf func(string, string) []KeyValue,
 	for {
 		args.Rand_Id = nrand()
 		reply := ReplyType{}
-		ok := CallMaster("Coordinator.Handle", args, &reply)
+		ok := CallMaster("Master.RPChandle", args, &reply)
 		if ok {
 			switch reply.Reply_type {
 			case RPC_REPLY_REDUCE:
@@ -206,7 +207,7 @@ func call_done(id int, _type int) {
 	// fmt.Printf("done %v %v\n", id, os.Getpid())
 	args := ArgsType{ID: id, Send_type: _type}
 	reply := ReplyType{}
-	ok := CallMaster("Coordinator.Handle", args, &reply)
+	ok := CallMaster("Master.RPChandle", args, &reply)
 	if !ok {
 		log.Fatalf("rpc send error")
 	}

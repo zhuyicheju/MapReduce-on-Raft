@@ -1,6 +1,16 @@
 package master
 
-func (m *Master)handleTask(cmd *Op) *Reply{
+import (
+	"log"
+	"mrrf/raft"
+	"mrrf/rpcargs"
+	"net"
+	"net/rpc"
+	"sync"
+	"sync/atomic"
+)
+
+func (m *Master)handleTask(cmd *Op) *Reply_type{
 	reply = new(Reply_type)
 
 	if m.reduce_is_done {

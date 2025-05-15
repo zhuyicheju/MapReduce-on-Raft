@@ -2,6 +2,7 @@ package main
 
 import (
 	"mrrf/raft"
+	"mrrf/master"
 	"sync"
 )
 
@@ -11,6 +12,8 @@ var IPaddr = [4]string{
 	"127.0.0.1:8002",
 	"127.0.0.1:8003",
 }
+
+var files []string
 
 type config struct {
 	mu      sync.Mutex
@@ -60,10 +63,10 @@ func make_config(n int) *config {
 }
 
 func makeMaster(me int, done chan bool) {
-	master := master.MakeMaster(cfg.addrs, me, cfg.saved[me], 100, done)
+	master := master.MakeMaster(cfg.addrs, me, cfg.saved[me], 100, done, files, 10)
 	cfg.masters[me] = master
 }
 
 func main() {
-
+	make_config(3)
 }

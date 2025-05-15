@@ -3,6 +3,7 @@ package master
 import (
 	"log"
 	"mrrf/raft"
+	"mrrf/rpcargs"
 	"net"
 	"net/rpc"
 	"sync"
@@ -35,7 +36,7 @@ type Master struct {
 	maxraftstate int // snapshot if log grows this big
 
 	//commit后保存
-	id2reply map[int64]*reply
+	id2reply map[int64]*Reply_type
 	id2chan  map[int]chan *Reply_type
 	lastApplied int
 
@@ -111,8 +112,8 @@ func (m *Master)handleApply() {
 	}
 }
 
-func MakeMaster(servers []string, me int, persister *raft.Persister, maxraftstate int, done chan bool
-				,files []string, nReduce int) *KVServer {
+func MakeMaster(servers []string, me int, persister *raft.Persister, maxraftstate int, done chan bool,
+				files []string, nReduce int) *KVServer {
 
 	master := new(Master)
 	master.me = me
