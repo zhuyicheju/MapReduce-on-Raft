@@ -1,0 +1,3 @@
+本项目基于我在MIT 6.824(现6.5840)中实现的MapReduce和Raft，构建出基于Raft和Mapreduce的分布式计算倒排索引。
+
+传统的6.824课程中实现的Mapreduce为单Master多Worker模式，若Master崩溃，整个系统即随之崩溃，为了改进，本项目加入了多Master机制，以及多Master之间通信共识的机制：Raft
