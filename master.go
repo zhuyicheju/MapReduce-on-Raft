@@ -19,7 +19,10 @@ const (
 )
 
 type Op struct {
-	
+	Send_type  request_t
+	ID         int
+	timestamp  int64
+	Rand_Id    int64
 }
 
 type Master struct {
@@ -32,10 +35,14 @@ type Master struct {
 	maxraftstate int // snapshot if log grows this big
 
 	//commit后保存
+	id2reply map[int64]*reply
+	id2chan  map[int]chan *Reply_type
+
 	files   []string
 	nReduce int
 	nMap    int
 	mutex   sync.Mutex
+	reply   []Reply_type
 
 	reduce_is_done     bool
 	reduce_done_num    int32
@@ -59,18 +66,36 @@ func (m *Master) RPChandle(args *ArgsType, reply *ReplyType) error {
 		return nil
 	}
 
+	if rply, ok := m.id2reply[args.Rand_Id]; ok {
+		*reply = *rply
+	}
+
+	cmd := Op{Send_type: args.Send_type, ID: args.ID, timestamp: time.Now().UnixMilli(), }
+
 	index, _, isLeader := m.rf.Start(cmd)
 	if !isLeader {
 		reply.Err = "ErrWrongLeader"
 		return nil
 	}
 
-	res := m.waitForApply(index)
-	*reply = res
+	res, ok := m.waitForApply(index)
+	if !ok {
+		//让其以相同请求id再次请求
+		reply.Reply_type = RPC_REPLY_ERR
+	}
+
+	*reply = *res
 	return nil
 }
 
-
+func (m *Master)waitForApply(index int) (*Reply_type, bool){
+	select {
+	case <-time.After(2*time.Second):
+		return nil,false
+	case reply := <-m.id2chan[index]:
+		return reply,true
+	}
+}
 
 func MakeMaster(servers []string, me int, persister *raft.Persister, maxraftstate int, done chan bool
 				,files []string, nReduce int) *KVServer {

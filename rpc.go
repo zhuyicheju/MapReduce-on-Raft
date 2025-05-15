@@ -17,6 +17,7 @@ const (
 type request_t = int
 
 type ArgsType struct {
+	Rand_Id   int64
 	Send_type int
 	ID        int
 }
