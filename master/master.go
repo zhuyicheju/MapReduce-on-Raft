@@ -2,7 +2,6 @@ package master
 
 import (
 	"log"
-	"mrrf/minheap"
 	"mrrf/raft"
 	"net"
 	"net/rpc"
@@ -21,7 +20,7 @@ const (
 type Op struct {
 	Send_type  request_t
 	ID         int
-	timestamp  int64
+	Timestamp  int64
 	Rand_Id    int64
 }
 
@@ -30,6 +29,7 @@ type Master struct {
 	me      int
 	rf      *raft.Raft
 	applyCh chan raft.ApplyMsg
+	stop    chan bool
 	dead    int32 // set by Kill()
 
 	maxraftstate int // snapshot if log grows this big
@@ -37,6 +37,7 @@ type Master struct {
 	//commit后保存
 	id2reply map[int64]*reply
 	id2chan  map[int]chan *Reply_type
+	lastApplied int
 
 	files   []string
 	nReduce int
@@ -62,7 +63,7 @@ type Master struct {
 func (m *Master) RPChandle(args *ArgsType, reply *ReplyType) error {
 	_, isLeader := m.rf.GetState()
 	if !isLeader {
-		reply.Err = "ErrWrongLeader"
+		reply.Reply_type = RPC_REPLY_WRONG_LEADER
 		return nil
 	}
 
@@ -70,18 +71,18 @@ func (m *Master) RPChandle(args *ArgsType, reply *ReplyType) error {
 		*reply = *rply
 	}
 
-	cmd := Op{Send_type: args.Send_type, ID: args.ID, timestamp: time.Now().UnixMilli(), }
+	cmd := Op{Send_type: args.Send_type, ID: args.ID, Timestamp: time.Now().UnixMilli(), Rand_Id: args.Rand_Id}
 
-	index, _, isLeader := m.rf.Start(cmd)
+	_, _, isLeader := m.rf.Start(cmd)
 	if !isLeader {
-		reply.Err = "ErrWrongLeader"
+		reply.Reply_type = RPC_REPLY_WRONG_LEADER
 		return nil
 	}
 
-	res, ok := m.waitForApply(index)
+	res, ok := m.waitForApply(Rand_Id)
 	if !ok {
 		//让其以相同请求id再次请求
-		reply.Reply_type = RPC_REPLY_ERR
+		reply.Reply_type = RPC_REPLY_TIMEOUT
 	}
 
 	*reply = *res
@@ -97,6 +98,19 @@ func (m *Master)waitForApply(index int) (*Reply_type, bool){
 	}
 }
 
+func (m *Master)handleApply() {
+	for !m.killed() {
+	select{
+	case <-m.stop:
+		return
+	case cmd := <- m.applyCh:
+		reply := m.handleTask(&cmd)
+		m.id2reply[cmd.Rand_Id] = reply
+		m.id2chan[cmd.Rand_Id] <- reply
+	}
+	}
+}
+
 func MakeMaster(servers []string, me int, persister *raft.Persister, maxraftstate int, done chan bool
 				,files []string, nReduce int) *KVServer {
 
@@ -106,6 +120,7 @@ func MakeMaster(servers []string, me int, persister *raft.Persister, maxraftstat
 
 	master.applyCh = make(chan raft.ApplyMsg)
 	master.rf = raft.Make(servers, me, persister, kv.applyCh)
+	master.stop = make(chan bool)
 
 	go func(me int) {
 		server := rpc.NewServer()
@@ -124,12 +139,6 @@ func MakeMaster(servers []string, me int, persister *raft.Persister, maxraftstat
 	}(me)
 
 	master.Init(files, nReduce)
-
-	go func(me int, applyCh chan ApplyMsg) {
-		for msg := range applyCh {
-			log.Printf("[Raft %d] Apply: %+v", me, msg)
-		}
-	}(me, applyCh)
 
 	return master
 }
@@ -155,12 +164,13 @@ func (m *Master) Init(files []string, nReduce int) {
 
 }
 
-func (kv *KVServer) Kill() {
-	atomic.StoreInt32(&kv.dead, 1)
+func (m *Master) Kill() {
+	atomic.StoreInt32(&m.dead, 1)
 	kv.rf.Kill()
+	stop <- true
 }
 
-func (kv *KVServer) killed() bool {
-	z := atomic.LoadInt32(&kv.dead)
+func (m *Master) killed() bool {
+	z := atomic.LoadInt32(&m.dead)
 	return z == 1
 }

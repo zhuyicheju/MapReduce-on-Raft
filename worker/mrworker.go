@@ -15,8 +15,7 @@ import (
 	"log"
 	"os"
 	"plugin"
-
-	"6.5840/mr"
+	// "6.5840/mr"
 )
 
 func main() {
