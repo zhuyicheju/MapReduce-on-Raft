@@ -4,7 +4,12 @@ import (
 	"mrrf/raft"
 	"mrrf/master"
 	"sync"
+	"time"
+	"os"
 )
+
+type Master = master.Master
+type Persister = raft.Persister
 
 var IPaddr = [4]string{
 	"127.0.0.1:8000",
@@ -13,7 +18,7 @@ var IPaddr = [4]string{
 	"127.0.0.1:8003",
 }
 
-var files []string
+
 
 type config struct {
 	mu      sync.Mutex
@@ -32,8 +37,8 @@ type config struct {
 	// ops   int32     // number of clerk get/put/append method calls
 }
 
-func make_config(n int) *config {
-	cfg := &Config{}
+func make_config(n int, files []string) *config {
+	cfg := &config{}
 	cfg.n = n
 	cfg.addrs = make([]string, n)
 	cfg.saved = make([]*Persister, n)
@@ -45,7 +50,7 @@ func make_config(n int) *config {
 
 	done := make(chan bool, n)
 	for i := 0; i < n; i++ {
-		go cfg.makeMaster(i, done)
+		go cfg.makeMaster(i, files, done)
 	}
 	//先创建实例与监听
 
@@ -62,11 +67,13 @@ func make_config(n int) *config {
 	return cfg
 }
 
-func makeMaster(me int, done chan bool) {
+func (cfg *config)makeMaster(me int, files []string, done chan bool) {
 	master := master.MakeMaster(cfg.addrs, me, cfg.saved[me], 100, done, files, 10)
 	cfg.masters[me] = master
 }
 
 func main() {
-	make_config(3)
+	make_config(3, os.Args[1:])
+
+	time.Sleep(10 * time.Second)
 }

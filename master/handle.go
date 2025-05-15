@@ -1,31 +1,29 @@
 package master
 
 import (
-	"log"
-	"mrrf/raft"
 	"mrrf/rpcargs"
-	"net"
-	"net/rpc"
-	"sync"
 	"sync/atomic"
+	"container/heap"
 )
 
-func (m *Master)handleTask(cmd *Op) *Reply_type{
-	reply = new(Reply_type)
+const MS2S = 1000
+
+func (m *Master)handleTask(cmd *Op) *ReplyType{
+	reply := new(ReplyType)
 
 	if m.reduce_is_done {
-		reply.Reply_type = RPC_REPLY_DONE
+		reply.Reply_type = rpcargs.RPC_REPLY_DONE
 		return nil
 	}
 
-	switch args.Send_type {
-	case RPC_SEND_DONE_MAP:
+	switch cmd.Send_type {
+	case rpcargs.RPC_SEND_DONE_MAP:
 		DoneMap(m, cmd, reply)
-	case RPC_SEND_DONE_REDUCE:
+	case rpcargs.RPC_SEND_DONE_REDUCE:
 		DoneReduce(m, cmd, reply)
-	case RPC_SEND_ERROR:
+	case rpcargs.RPC_SEND_ERROR:
 		//do nothing
-	case RPC_SEND_REQUEST:
+	case rpcargs.RPC_SEND_REQUEST:
 		if !m.map_is_done {
 			RequestMap(m, cmd, reply)
 		} else {
@@ -38,10 +36,10 @@ func (m *Master)handleTask(cmd *Op) *Reply_type{
 
 func DoneMap(m *Master, cmd *Op, reply *ReplyType) {
 	// fmt.Printf("DoneMap %v\n", args.ID)
-	id := args.ID
+	id := cmd.ID
 	m.map_status_lock[id].Lock()
 	if m.map_status[id] != STATUS_DONE {
-		atomim.AddInt32(&m.map_done_num, 1)
+		atomic.AddInt32(&m.map_done_num, 1)
 		m.map_status[id] = STATUS_DONE
 		if m.map_done_num == int32(m.nMap) {
 			m.map_is_done = true
@@ -51,11 +49,11 @@ func DoneMap(m *Master, cmd *Op, reply *ReplyType) {
 }
 func DoneReduce(m *Master, cmd *Op, reply *ReplyType) {
 	// fmt.Printf("DoneReduce %v\n", args.ID)
-	id := args.ID
+	id := cmd.ID
 
 	m.reduce_status_lock[id].Lock()
 	if m.reduce_status[id] != STATUS_DONE {
-		atomim.AddInt32(&m.reduce_done_num, 1)
+		atomic.AddInt32(&m.reduce_done_num, 1)
 		m.reduce_status[id] = STATUS_DONE
 		if m.reduce_done_num == int32(m.nReduce) {
 			m.reduce_is_done = true
@@ -64,7 +62,7 @@ func DoneReduce(m *Master, cmd *Op, reply *ReplyType) {
 	m.reduce_status_lock[id].Unlock()
 }
 func RequestMap(m *Master, cmd *Op, reply *ReplyType) {
-	reply.Reply_type = RPC_REPLY_MAP
+	reply.Reply_type = rpcargs.RPC_REPLY_MAP
 	reply.NReduce = m.nReduce
 	reply.NMap = m.nMap
 
@@ -72,7 +70,7 @@ func RequestMap(m *Master, cmd *Op, reply *ReplyType) {
 	for restart {
 		m.map_heap_lock.Lock()
 		if m.map_heap.Len() == 0 {
-			reply.Reply_type = RPC_REPLY_WAIT
+			reply.Reply_type = rpcargs.RPC_REPLY_WAIT
 			m.map_heap_lock.Unlock()
 			return
 		}
@@ -103,7 +101,7 @@ func RequestMap(m *Master, cmd *Op, reply *ReplyType) {
 
 		case STATUS_WORKING:
 			restart = false
-			reply.Reply_type = RPC_REPLY_WAIT
+			reply.Reply_type = rpcargs.RPC_REPLY_WAIT
 			m.map_heap_lock.Lock()
 			heap.Push(&m.map_heap, tasknode{task.task_id, task.timestamp})
 			m.map_heap_lock.Unlock()
@@ -113,7 +111,7 @@ func RequestMap(m *Master, cmd *Op, reply *ReplyType) {
 }
 
 func RequestReduce(m *Master, cmd *Op, reply *ReplyType) {
-	reply.Reply_type = RPC_REPLY_REDUCE
+	reply.Reply_type = rpcargs.RPC_REPLY_REDUCE
 	reply.NReduce = m.nReduce
 	reply.NMap = m.nMap
 
@@ -122,7 +120,7 @@ func RequestReduce(m *Master, cmd *Op, reply *ReplyType) {
 		restart = false
 		m.reduce_heap_lock.Lock()
 		if m.reduce_heap.Len() == 0 {
-			reply.Reply_type = RPC_REPLY_DONE
+			reply.Reply_type = rpcargs.RPC_REPLY_DONE
 			m.reduce_heap_lock.Unlock()
 			break
 		}
@@ -151,7 +149,7 @@ func RequestReduce(m *Master, cmd *Op, reply *ReplyType) {
 			m.reduce_heap_lock.Unlock()
 
 		case STATUS_WORKING:
-			reply.Reply_type = RPC_REPLY_WAIT
+			reply.Reply_type = rpcargs.RPC_REPLY_WAIT
 			m.reduce_heap_lock.Lock()
 			heap.Push(&m.reduce_heap, tasknode{task.task_id, task.timestamp})
 			m.reduce_heap_lock.Unlock()

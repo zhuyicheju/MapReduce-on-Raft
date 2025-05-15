@@ -1,3 +1,4 @@
+package worker
 type ByKey []KeyValue
 type MinHeap []Merge
 type KeyValue struct {

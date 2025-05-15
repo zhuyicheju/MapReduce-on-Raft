@@ -8,21 +8,22 @@ import (
 	"io"
 	"log"
 	"net/rpc"
+	"math/rand"
 	"os"
 	"sort"
 	"time"
 	"mrrf/rpcargs"
 )
 
+type request_t = int
+type ReplyType = rpcargs.ReplyType
+type ArgsType = rpcargs.ArgsType
 
 var IPaddr []string
 var client []*rpc.Client
 
 func nrand() int64 {
-	max := big.NewInt(int64(1) << 62)
-	bigx, _ := rand.Int(rand.Reader, max)
-	x := bigx.Int64()
-	return x
+	return rand.Int63()
 }
 
 // Map functions return a slice of KeyValue.
@@ -37,7 +38,7 @@ func ihash(key string) int {
 func netinit(addr []string){
 	IPaddr = addr
 	client = make([]*rpc.Client, len(addr))
-	for i,ip := addr {
+	for i,ip := range addr {
 		_client, err := rpc.Dial("tcp", ip)
 		client[i] = _client
 		if err != nil {
@@ -51,9 +52,10 @@ func Worker(addr []string, mapf func(string, string) []KeyValue,
 	reducef func(string, []string) string) {
 	// fmt.Println("Worker running...")
 	
+	rand.Seed(time.Now().UnixNano())
 	netinit(addr)
 
-	args := ArgsType{Send_type: RPC_SEND_REQUEST}
+	args := ArgsType{Send_type: rpcargs.RPC_SEND_REQUEST}
 	is_done := false
 	for {
 		args.Rand_Id = nrand()
@@ -61,13 +63,13 @@ func Worker(addr []string, mapf func(string, string) []KeyValue,
 		ok := CallMaster("Master.RPChandle", args, &reply)
 		if ok {
 			switch reply.Reply_type {
-			case RPC_REPLY_REDUCE:
+			case rpcargs.RPC_REPLY_REDUCE:
 				do_reduce(reply.ID, reply.NMap, reducef)
-			case RPC_REPLY_MAP:
+			case rpcargs.RPC_REPLY_MAP:
 				do_map(reply.ID, reply.File, reply.NReduce, mapf)
-			case RPC_REPLY_DONE:
+			case rpcargs.RPC_REPLY_DONE:
 				is_done = true
-			case RPC_REPLY_WAIT:
+			case rpcargs.RPC_REPLY_WAIT:
 				time.Sleep(1 * time.Second / 2)
 			}
 		} else {
@@ -85,12 +87,12 @@ func do_map(id int, filename string, nReduce int, mapf func(string, string) []Ke
 	file, err := os.Open(filename)
 	if err != nil {
 		log.Fatalf("cannot open %v", filename)
-		call_done(id, RPC_SEND_ERROR)
+		call_done(id, rpcargs.RPC_SEND_ERROR)
 	}
 	content, err := io.ReadAll(file)
 	if err != nil {
 		log.Fatalf("cannot read read %v", filename)
-		call_done(id, RPC_SEND_ERROR)
+		call_done(id, rpcargs.RPC_SEND_ERROR)
 	}
 	file.Close()
 
@@ -105,7 +107,7 @@ func do_map(id int, filename string, nReduce int, mapf func(string, string) []Ke
 		file, err := os.CreateTemp("", jsonname)
 		if err != nil {
 			log.Fatalf("cannot create file %v", jsonname)
-			call_done(id, RPC_SEND_ERROR)
+			call_done(id, rpcargs.RPC_SEND_ERROR)
 		}
 		enc := json.NewEncoder(file)
 		files = append(files, file)
@@ -120,7 +122,7 @@ func do_map(id int, filename string, nReduce int, mapf func(string, string) []Ke
 		err := reducefiles[partition].Encode(&kv)
 		if err != nil {
 			log.Fatalf("cannot encode json %v", err)
-			call_done(id, RPC_SEND_ERROR)
+			call_done(id, rpcargs.RPC_SEND_ERROR)
 		}
 	}
 	//填入json
@@ -130,7 +132,7 @@ func do_map(id int, filename string, nReduce int, mapf func(string, string) []Ke
 		os.Rename(file.Name(), jsonname)
 	}
 
-	call_done(id, RPC_SEND_DONE_MAP)
+	call_done(id, rpcargs.RPC_SEND_DONE_MAP)
 
 }
 
@@ -144,7 +146,7 @@ func do_reduce(id int, nMap int, reducef func(string, []string) string) {
 		file, err := os.Open(jsonname)
 		if err != nil {
 			log.Fatalf("cannot open file %v", jsonname)
-			call_done(id, RPC_SEND_ERROR)
+			call_done(id, rpcargs.RPC_SEND_ERROR)
 		}
 		dec := json.NewDecoder(file)
 		reducefiles = append(reducefiles, dec)
@@ -200,7 +202,7 @@ func do_reduce(id int, nMap int, reducef func(string, []string) string) {
 	}
 
 	os.Rename(ofile.Name(), oname)
-	call_done(id, RPC_SEND_DONE_REDUCE)
+	call_done(id, rpcargs.RPC_SEND_DONE_REDUCE)
 }
 
 func call_done(id int, _type int) {
@@ -219,18 +221,19 @@ func CallMaster(name string, args interface{}, reply interface{}) bool {
 		restart = false
 		for i := range client {
 			err := client[i].Call(name, args, reply)
-			if err {
+			if err != nil {
 				restart = true
 				continue
 			}
-			if reply.Reply_type == RPC_REPLY_WRONG_LEADER {
+			if reply.(ReplyType).Reply_type == rpcargs.RPC_REPLY_WRONG_LEADER {
 				continue
 			}
-			if reply.Reply_type == RPC_REPLY_TIMEOUT {
+			if reply.(ReplyType).Reply_type == rpcargs.RPC_REPLY_TIMEOUT {
 				restart = true
 				break
 			}
 			return true
 		}
 	}
+	return true
 }

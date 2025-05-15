@@ -4,11 +4,17 @@ import (
 	"log"
 	"mrrf/raft"
 	"mrrf/rpcargs"
+	"container/heap"
 	"net"
 	"net/rpc"
 	"sync"
 	"sync/atomic"
+	"time"
 )
+
+type request_t = int
+type ReplyType = rpcargs.ReplyType
+type ArgsType = rpcargs.ArgsType
 
 const (
 	STATUS_PENDING = iota
@@ -36,15 +42,14 @@ type Master struct {
 	maxraftstate int // snapshot if log grows this big
 
 	//commit后保存
-	id2reply map[int64]*Reply_type
-	id2chan  map[int]chan *Reply_type
+	id2reply map[int64]*ReplyType
+	id2chan  map[int64]chan *ReplyType
 	lastApplied int
 
 	files   []string
 	nReduce int
 	nMap    int
 	mutex   sync.Mutex
-	reply   []Reply_type
 
 	reduce_is_done     bool
 	reduce_done_num    int32
@@ -64,7 +69,7 @@ type Master struct {
 func (m *Master) RPChandle(args *ArgsType, reply *ReplyType) error {
 	_, isLeader := m.rf.GetState()
 	if !isLeader {
-		reply.Reply_type = RPC_REPLY_WRONG_LEADER
+		reply.Reply_type = rpcargs.RPC_REPLY_WRONG_LEADER
 		return nil
 	}
 
@@ -74,23 +79,23 @@ func (m *Master) RPChandle(args *ArgsType, reply *ReplyType) error {
 
 	cmd := Op{Send_type: args.Send_type, ID: args.ID, Timestamp: time.Now().UnixMilli(), Rand_Id: args.Rand_Id}
 
-	_, _, isLeader := m.rf.Start(cmd)
+	_, _, isLeader = m.rf.Start(cmd)
 	if !isLeader {
-		reply.Reply_type = RPC_REPLY_WRONG_LEADER
+		reply.Reply_type = rpcargs.RPC_REPLY_WRONG_LEADER
 		return nil
 	}
 
-	res, ok := m.waitForApply(Rand_Id)
+	res, ok := m.waitForApply(args.Rand_Id)
 	if !ok {
 		//让其以相同请求id再次请求
-		reply.Reply_type = RPC_REPLY_TIMEOUT
+		reply.Reply_type = rpcargs.RPC_REPLY_TIMEOUT
 	}
 
 	*reply = *res
 	return nil
 }
 
-func (m *Master)waitForApply(index int) (*Reply_type, bool){
+func (m *Master)waitForApply(index int64) (*ReplyType, bool){
 	select {
 	case <-time.After(2*time.Second):
 		return nil,false
@@ -104,7 +109,8 @@ func (m *Master)handleApply() {
 	select{
 	case <-m.stop:
 		return
-	case cmd := <- m.applyCh:
+	case apply := <- m.applyCh:
+		cmd := apply.Command.(Op)
 		reply := m.handleTask(&cmd)
 		m.id2reply[cmd.Rand_Id] = reply
 		m.id2chan[cmd.Rand_Id] <- reply
@@ -113,20 +119,20 @@ func (m *Master)handleApply() {
 }
 
 func MakeMaster(servers []string, me int, persister *raft.Persister, maxraftstate int, done chan bool,
-				files []string, nReduce int) *KVServer {
+				files []string, nReduce int) *Master {
 
 	master := new(Master)
 	master.me = me
 	master.maxraftstate = maxraftstate
 
 	master.applyCh = make(chan raft.ApplyMsg)
-	master.rf = raft.Make(servers, me, persister, kv.applyCh)
+	master.rf = raft.Make(servers, me, persister, master.applyCh)
 	master.stop = make(chan bool)
 
 	go func(me int) {
 		server := rpc.NewServer()
-		server.Register(rf)
-		listener, err := net.Listen("tcp", cfg.addrs[me])
+		server.Register(master.rf)
+		listener, err := net.Listen("tcp", servers[me])
 		if err != nil {
 			log.Fatalf("Raft %d listen error: %v", me, err)
 		}
@@ -144,6 +150,10 @@ func MakeMaster(servers []string, me int, persister *raft.Persister, maxraftstat
 	return master
 }
 
+func (m *Master) Open(){
+	m.rf.Open()
+}
+
 func (m *Master) Init(files []string, nReduce int) {
 	m.files = files
 	m.nReduce = nReduce
@@ -151,7 +161,7 @@ func (m *Master) Init(files []string, nReduce int) {
 
 	heap.Init(&m.map_heap)
 	for i := 0; i < m.nMap; i++ {
-		heap.Push(&c.map_heap, tasknode{task_id: i, timestamp: 0})
+		heap.Push(&m.map_heap, tasknode{task_id: i, timestamp: 0})
 		m.map_status = append(m.map_status, STATUS_PENDING)
 		m.map_status_lock = append(m.map_status_lock, sync.Mutex{})
 	}
@@ -167,8 +177,8 @@ func (m *Master) Init(files []string, nReduce int) {
 
 func (m *Master) Kill() {
 	atomic.StoreInt32(&m.dead, 1)
-	kv.rf.Kill()
-	stop <- true
+	m.rf.Kill()
+	m.stop <- true
 }
 
 func (m *Master) killed() bool {

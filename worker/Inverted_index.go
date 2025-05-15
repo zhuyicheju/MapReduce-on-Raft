@@ -1,13 +1,12 @@
-package mrapp
+package worker
 
 import (
-	"mr"
 	"sort"
 	"strings"
 	"unicode"
 )
 
-func Map(filename string, contents string) []mr.KeyValue {
+func Map(filename string, contents string) []KeyValue {
 	// function to detect word separators.
 	ff := func(r rune) bool { return !unicode.IsLetter(r) }
 
@@ -22,10 +21,10 @@ func Map(filename string, contents string) []mr.KeyValue {
 		}
 	}
 
-	kva := []mr.KeyValue{}
+	kva := []KeyValue{}
 	for word := range uniqueWords {
 		// Key 是词，Value 是文档名
-		kva = append(kva, mr.KeyValue{Key: word, Value: filename})
+		kva = append(kva, KeyValue{Key: word, Value: filename})
 	}
 	return kva
 }
