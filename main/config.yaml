@@ -1,0 +1,23 @@
+raft:
+  nodes:
+    - "127.0.0.1:8000"
+    - "127.0.0.1:8001"
+    - "127.0.0.1:8002"
+  election_timeout: 300
+  election_timeout_random: 200
+  heartbeat_interval: 100
+
+master:
+  nMaster: 3
+  files: pg*
+  nReduce: 10
+
+worker:
+  nWorker: 3
+  plugin: Inverted_index.so
+
+
+log:
+  level: "info"
+  masterfile: "./logs/master"
+  workerfile: "./logs/worker"
