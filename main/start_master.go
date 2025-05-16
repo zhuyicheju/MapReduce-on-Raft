@@ -11,6 +11,7 @@ import (
 )
 
 type Master = master.Master
+type Persister = raft.Persister
 
 // type Persister = raft.Persister
 

@@ -9,15 +9,23 @@ raft:
 
 master:
   nMaster: 3
-  files: pg*
+  files:
+    - "pg-being_ernest.txt"
+    - "pg-dorian_gray.txt"
+    - "pg-frankenstein.txt"
+    - "pg-grimm.txt"
+    - "pg-huckleberry_finn.txt"
+    - "pg-metamorphosis.txt"
+    - "pg-sherlock_holmes.txt"
+    - "pg-tom_sawyer.txt"
   nReduce: 10
 
 worker:
-  nWorker: 3
+  nWorker: 1
   plugin: Inverted_index.so
 
 
 log:
   level: "info"
-  masterfile: "./logs/master"
-  workerfile: "./logs/worker"
+  masterfile: "../logs/master"
+  workerfile: "../logs/worker"

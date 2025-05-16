@@ -4,6 +4,7 @@ import (
 	"flag"
 	"log"
 	"mrrf/config"
+	"mrrf/logging"
 	"mrrf/worker"
 	"plugin"
 	"sync"
@@ -31,8 +32,15 @@ func main() {
 	nWorker := config.GlobalConfig.Worker.NWorker
 	pluginFile := config.GlobalConfig.Worker.Plugin
 	addrs := config.GlobalConfig.Raft.IPaddr
+	level := config.GlobalConfig.Log.Level
+	logfile := config.GlobalConfig.Log.WorkerFile
 
 	mapf, reducef := loadPlugin(pluginFile)
+
+	logging.InitLogger(level, logfile)
+	defer logging.Logger.Sync()
+
+	logging.Logger.Info("服务启动")
 
 	var wg sync.WaitGroup
 
@@ -52,7 +60,7 @@ func main() {
 func loadPlugin(filename string) (func(string, string) []worker.KeyValue, func(string, []string) string) {
 	p, err := plugin.Open(filename)
 	if err != nil {
-		log.Fatalf("cannot load plugin %v", filename)
+		log.Fatalf("cannot load plugin %v %v", filename, err)
 	}
 	xmapf, err := p.Lookup("Map")
 	if err != nil {
