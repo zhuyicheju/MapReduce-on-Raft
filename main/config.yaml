@@ -26,6 +26,6 @@ worker:
 
 
 log:
-  level: "info"
+  level: "debug"
   masterfile: "../logs/master"
   workerfile: "../logs/worker"
