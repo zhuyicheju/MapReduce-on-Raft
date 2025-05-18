@@ -10,14 +10,14 @@ raft:
 master:
   nMaster: 3
   files:
-    - "pg-being_ernest.txt"
-    - "pg-dorian_gray.txt"
-    - "pg-frankenstein.txt"
-    - "pg-grimm.txt"
-    - "pg-huckleberry_finn.txt"
-    - "pg-metamorphosis.txt"
-    - "pg-sherlock_holmes.txt"
-    - "pg-tom_sawyer.txt"
+    - "../assets/pg-being_ernest.txt"
+    - "../assets/pg-dorian_gray.txt"
+    - "../assets/pg-frankenstein.txt"
+    - "../assets/pg-grimm.txt"
+    - "../assets/pg-huckleberry_finn.txt"
+    - "../assets/pg-metamorphosis.txt"
+    - "../assets/pg-sherlock_holmes.txt"
+    - "../assets/pg-tom_sawyer.txt"
   nReduce: 10
 
 worker:
@@ -26,6 +26,6 @@ worker:
 
 
 log:
-  level: "debug"
+  level: "info"
   masterfile: "../logs/master"
   workerfile: "../logs/worker"
