@@ -10,22 +10,22 @@ raft:
 master:
   nMaster: 3
   files:
-    - "../assets/pg-being_ernest.txt"
-    - "../assets/pg-dorian_gray.txt"
-    - "../assets/pg-frankenstein.txt"
-    - "../assets/pg-grimm.txt"
-    - "../assets/pg-huckleberry_finn.txt"
-    - "../assets/pg-metamorphosis.txt"
-    - "../assets/pg-sherlock_holmes.txt"
-    - "../assets/pg-tom_sawyer.txt"
+    - "/home/zhuyicheju/Desktop/Mapreduce-on-Raft/assets/pg-being_ernest.txt"
+    - "/home/zhuyicheju/Desktop/Mapreduce-on-Raft/assets/pg-dorian_gray.txt"
+    - "/home/zhuyicheju/Desktop/Mapreduce-on-Raft/assets/pg-frankenstein.txt"
+    - "/home/zhuyicheju/Desktop/Mapreduce-on-Raft/assets/pg-grimm.txt"
+    - "/home/zhuyicheju/Desktop/Mapreduce-on-Raft/assets/pg-huckleberry_finn.txt"
+    - "/home/zhuyicheju/Desktop/Mapreduce-on-Raft/assets/pg-metamorphosis.txt"
+    - "/home/zhuyicheju/Desktop/Mapreduce-on-Raft/assets/pg-sherlock_holmes.txt"
+    - "/home/zhuyicheju/Desktop/Mapreduce-on-Raft/assets/pg-tom_sawyer.txt"
   nReduce: 10
 
 worker:
-  nWorker: 1
-  plugin: Inverted_index.so
+  nWorker: 3
+  plugin: /home/zhuyicheju/Desktop/Mapreduce-on-Raft/main/Inverted_index.so
 
 
 log:
   level: "info"
-  masterfile: "../logs/master"
-  workerfile: "../logs/worker"
+  masterfile: "/home/zhuyicheju/Desktop/Mapreduce-on-Raft/logs/master"
+  workerfile: "/home/zhuyicheju/Desktop/Mapreduce-on-Raft/logs/worker"

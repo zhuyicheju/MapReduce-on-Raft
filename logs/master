@@ -1,0 +1,226 @@
+INFO	服务启动
+INFO	Master 启动成功	{"id": 2}
+INFO	Master 启动成功	{"id": 1}
+INFO	Master 启动成功	{"id": 0}
+INFO	Master 监听tcp	{"id": 1}
+INFO	Master 监听tcp	{"id": 0}
+INFO	Master 监听tcp	{"id": 2}
+INFO	分配Map任务
+	{"id": 0, "me": 1}
+INFO	分配Map任务
+	{"id": 0, "me": 0}
+INFO	分配Map任务
+	{"id": 0, "me": 2}
+INFO	分配Map任务
+	{"id": 1, "me": 1}
+INFO	分配Map任务
+	{"id": 1, "me": 0}
+INFO	分配Map任务
+	{"id": 1, "me": 2}
+INFO	分配Map任务
+	{"id": 2, "me": 1}
+INFO	分配Map任务
+	{"id": 2, "me": 2}
+INFO	完成Map任务
+	{"id": 0, "me": 1}
+INFO	分配Map任务
+	{"id": 2, "me": 0}
+INFO	完成Map任务
+	{"id": 0, "me": 2}
+INFO	完成Map任务
+	{"id": 1, "me": 1}
+INFO	完成Map任务
+	{"id": 0, "me": 0}
+INFO	完成Map任务
+	{"id": 1, "me": 0}
+INFO	完成Map任务
+	{"id": 1, "me": 2}
+INFO	完成Map任务
+	{"id": 2, "me": 1}
+INFO	完成Map任务
+	{"id": 2, "me": 0}
+INFO	完成Map任务
+	{"id": 2, "me": 2}
+INFO	分配Map任务
+	{"id": 3, "me": 1}
+INFO	分配Map任务
+	{"id": 3, "me": 2}
+INFO	分配Map任务
+	{"id": 3, "me": 0}
+INFO	分配Map任务
+	{"id": 4, "me": 1}
+INFO	分配Map任务
+	{"id": 4, "me": 2}
+INFO	分配Map任务
+	{"id": 5, "me": 1}
+INFO	分配Map任务
+	{"id": 4, "me": 0}
+INFO	分配Map任务
+	{"id": 5, "me": 0}
+INFO	分配Map任务
+	{"id": 5, "me": 2}
+INFO	完成Map任务
+	{"id": 3, "me": 1}
+INFO	完成Map任务
+	{"id": 3, "me": 2}
+INFO	完成Map任务
+	{"id": 4, "me": 1}
+INFO	完成Map任务
+	{"id": 3, "me": 0}
+INFO	完成Map任务
+	{"id": 4, "me": 2}
+INFO	完成Map任务
+	{"id": 4, "me": 0}
+INFO	完成Map任务
+	{"id": 5, "me": 1}
+INFO	完成Map任务
+	{"id": 5, "me": 0}
+INFO	分配Map任务
+	{"id": 6, "me": 1}
+INFO	完成Map任务
+	{"id": 5, "me": 2}
+INFO	分配Map任务
+	{"id": 6, "me": 0}
+INFO	分配Map任务
+	{"id": 6, "me": 2}
+INFO	分配Map任务
+	{"id": 7, "me": 1}
+INFO	分配Map任务
+	{"id": 7, "me": 2}
+INFO	分配Map任务
+	{"id": 7, "me": 0}
+INFO	完成Map任务
+	{"id": 6, "me": 1}
+INFO	完成Map任务
+	{"id": 6, "me": 0}
+INFO	完成Map任务
+	{"id": 6, "me": 2}
+INFO	完成Map任务
+	{"id": 7, "me": 1}
+INFO	完成Map任务
+	{"id": 7, "me": 0}
+INFO	完成Map任务
+	{"id": 7, "me": 2}
+INFO	分配Reduce任务
+	{"id": 0, "me": 1}
+INFO	分配Reduce任务
+	{"id": 0, "me": 0}
+INFO	分配Reduce任务
+	{"id": 0, "me": 2}
+INFO	分配Reduce任务
+	{"id": 1, "me": 1}
+INFO	分配Reduce任务
+	{"id": 1, "me": 0}
+INFO	分配Reduce任务
+	{"id": 1, "me": 2}
+INFO	完成Reduce任务
+	{"id": 0, "me": 1}
+INFO	完成Reduce任务
+	{"id": 0, "me": 2}
+INFO	完成Reduce任务
+	{"id": 0, "me": 0}
+INFO	完成Reduce任务
+	{"id": 1, "me": 1}
+INFO	完成Reduce任务
+	{"id": 1, "me": 0}
+INFO	完成Reduce任务
+	{"id": 1, "me": 2}
+INFO	分配Reduce任务
+	{"id": 2, "me": 1}
+INFO	分配Reduce任务
+	{"id": 2, "me": 2}
+INFO	分配Reduce任务
+	{"id": 3, "me": 1}
+INFO	分配Reduce任务
+	{"id": 2, "me": 0}
+INFO	分配Reduce任务
+	{"id": 3, "me": 2}
+INFO	完成Reduce任务
+	{"id": 2, "me": 1}
+INFO	分配Reduce任务
+	{"id": 3, "me": 0}
+INFO	完成Reduce任务
+	{"id": 2, "me": 2}
+INFO	完成Reduce任务
+	{"id": 3, "me": 1}
+INFO	完成Reduce任务
+	{"id": 2, "me": 0}
+INFO	完成Reduce任务
+	{"id": 3, "me": 0}
+INFO	完成Reduce任务
+	{"id": 3, "me": 2}
+INFO	分配Reduce任务
+	{"id": 4, "me": 1}
+INFO	分配Reduce任务
+	{"id": 4, "me": 0}
+INFO	分配Reduce任务
+	{"id": 4, "me": 2}
+INFO	分配Reduce任务
+	{"id": 5, "me": 1}
+INFO	分配Reduce任务
+	{"id": 5, "me": 0}
+INFO	完成Reduce任务
+	{"id": 4, "me": 1}
+INFO	分配Reduce任务
+	{"id": 5, "me": 2}
+INFO	完成Reduce任务
+	{"id": 4, "me": 0}
+INFO	完成Reduce任务
+	{"id": 5, "me": 1}
+INFO	完成Reduce任务
+	{"id": 4, "me": 2}
+INFO	完成Reduce任务
+	{"id": 5, "me": 0}
+INFO	分配Reduce任务
+	{"id": 6, "me": 1}
+INFO	完成Reduce任务
+	{"id": 5, "me": 2}
+INFO	分配Reduce任务
+	{"id": 6, "me": 0}
+INFO	分配Reduce任务
+	{"id": 6, "me": 2}
+INFO	分配Reduce任务
+	{"id": 7, "me": 1}
+INFO	分配Reduce任务
+	{"id": 7, "me": 2}
+INFO	完成Reduce任务
+	{"id": 6, "me": 1}
+INFO	分配Reduce任务
+	{"id": 7, "me": 0}
+INFO	完成Reduce任务
+	{"id": 6, "me": 0}
+INFO	完成Reduce任务
+	{"id": 7, "me": 1}
+INFO	完成Reduce任务
+	{"id": 6, "me": 2}
+INFO	完成Reduce任务
+	{"id": 7, "me": 0}
+INFO	完成Reduce任务
+	{"id": 7, "me": 2}
+INFO	分配Reduce任务
+	{"id": 8, "me": 1}
+INFO	分配Reduce任务
+	{"id": 8, "me": 2}
+INFO	分配Reduce任务
+	{"id": 9, "me": 1}
+INFO	分配Reduce任务
+	{"id": 8, "me": 0}
+INFO	分配Reduce任务
+	{"id": 9, "me": 2}
+INFO	完成Reduce任务
+	{"id": 8, "me": 1}
+INFO	分配Reduce任务
+	{"id": 9, "me": 0}
+INFO	完成Reduce任务
+	{"id": 8, "me": 0}
+INFO	完成Reduce任务
+	{"id": 8, "me": 2}
+INFO	完成Reduce任务
+	{"id": 9, "me": 1}
+INFO	完成Reduce任务
+	{"id": 9, "me": 2}
+INFO	完成Reduce任务
+	{"id": 9, "me": 0}
+INFO	Master 关闭	{"id": 1}
+INFO	Master 关闭	{"id": 2}
+INFO	Master 关闭	{"id": 0}

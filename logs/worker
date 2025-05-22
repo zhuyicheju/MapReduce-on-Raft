@@ -1,0 +1,96 @@
+INFO	服务启动
+INFO	Worker 请求任务
+INFO	Worker 请求任务
+INFO	Worker 请求任务
+INFO	获得Map任务
+	{"ID": 0}
+INFO	Map任务完成
+	{"ID": 0}
+INFO	获得Map任务
+	{"ID": 1}
+INFO	Map任务完成
+	{"ID": 1}
+INFO	获得Map任务
+	{"ID": 2}
+INFO	Map任务完成
+	{"ID": 2}
+INFO	Worker 请求任务
+INFO	Worker 请求任务
+INFO	Worker 请求任务
+INFO	获得Map任务
+	{"ID": 3}
+INFO	Map任务完成
+	{"ID": 3}
+INFO	获得Map任务
+	{"ID": 4}
+INFO	Map任务完成
+	{"ID": 4}
+INFO	获得Map任务
+	{"ID": 5}
+INFO	Map任务完成
+	{"ID": 5}
+INFO	Worker 请求任务
+INFO	Worker 请求任务
+INFO	Worker 请求任务
+INFO	获得Map任务
+	{"ID": 6}
+INFO	获得Map任务
+	{"ID": 7}
+INFO	Map任务完成
+	{"ID": 6}
+INFO	Map任务完成
+	{"ID": 7}
+INFO	Worker 请求任务
+INFO	Worker 请求任务
+INFO	获得Reduce任务
+	{"ID": 0}
+INFO	Reduce任务完成
+	{"ID": 0}
+INFO	获得Reduce任务
+	{"ID": 1}
+INFO	Reduce任务完成
+	{"ID": 1}
+INFO	Worker 请求任务
+INFO	Worker 请求任务
+INFO	获得Reduce任务
+	{"ID": 2}
+INFO	Reduce任务完成
+	{"ID": 2}
+INFO	获得Reduce任务
+	{"ID": 3}
+INFO	Reduce任务完成
+	{"ID": 3}
+INFO	Worker 请求任务
+INFO	Worker 请求任务
+INFO	获得Reduce任务
+	{"ID": 4}
+INFO	Reduce任务完成
+	{"ID": 4}
+INFO	获得Reduce任务
+	{"ID": 5}
+INFO	Reduce任务完成
+	{"ID": 5}
+INFO	Worker 请求任务
+INFO	Worker 请求任务
+INFO	获得Reduce任务
+	{"ID": 6}
+INFO	Reduce任务完成
+	{"ID": 6}
+INFO	获得Reduce任务
+	{"ID": 7}
+INFO	Reduce任务完成
+	{"ID": 7}
+INFO	Worker 请求任务
+INFO	Worker 请求任务
+INFO	获得Reduce任务
+	{"ID": 8}
+INFO	Reduce任务完成
+	{"ID": 8}
+INFO	获得Reduce任务
+	{"ID": 9}
+INFO	Reduce任务完成
+	{"ID": 9}
+INFO	Worker 请求任务
+INFO	Worker 请求任务
+INFO	任务已完成
+	{"ID": 0}

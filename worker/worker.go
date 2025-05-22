@@ -7,19 +7,23 @@ import (
 	"hash/fnv"
 	"io"
 	"log"
-	"net/rpc"
 	"math/rand"
+	"mrrf/logging"
+	"mrrf/rpcargs"
+	"net/rpc"
 	"os"
 	"sort"
 	"time"
-	"mrrf/rpcargs"
+
+	_ "mrrf/master"
+
+	"go.uber.org/zap"
 )
 
 type request_t = int
 type ReplyType = rpcargs.ReplyType
 type ArgsType = rpcargs.ArgsType
 
-var IPaddr []string
 var client []*rpc.Client
 
 func nrand() int64 {
@@ -35,15 +39,14 @@ func ihash(key string) int {
 	return int(h.Sum32() & 0x7fffffff)
 }
 
-func netinit(addr []string){
-	IPaddr = addr
+func netinit(addr []string) {
 	client = make([]*rpc.Client, len(addr))
-	for i,ip := range addr {
+	for i, ip := range addr {
 		_client, err := rpc.Dial("tcp", ip)
-		client[i] = _client
 		if err != nil {
-			panic("连接失败")
+			panic("服务器未启动")
 		}
+		client[i] = _client
 	}
 }
 
@@ -51,35 +54,38 @@ func netinit(addr []string){
 func Worker(addr []string, mapf func(string, string) []KeyValue,
 	reducef func(string, []string) string) {
 	// fmt.Println("Worker running...")
-	
+	// wd, _ := os.Getwd()
+	// outPath := filepath.Join(wd, "out")
+	// os.Chdir(outPath)
+
 	rand.Seed(time.Now().UnixNano())
 	netinit(addr)
 
 	args := ArgsType{Send_type: rpcargs.RPC_SEND_REQUEST}
 	is_done := false
-	for {
+	for !is_done {
 		args.Rand_Id = nrand()
 		reply := ReplyType{}
-		ok := CallMaster("Master.RPChandle", args, &reply)
+		logging.Logger.Info("Worker 请求任务")
+		ok := CallMaster("Master.RPChandle", &args, &reply)
 		if ok {
 			switch reply.Reply_type {
 			case rpcargs.RPC_REPLY_REDUCE:
+				logging.Logger.Info("获得Reduce任务\n", zap.Int("ID", reply.ID))
 				do_reduce(reply.ID, reply.NMap, reducef)
 			case rpcargs.RPC_REPLY_MAP:
+				logging.Logger.Info("获得Map任务\n", zap.Int("ID", reply.ID))
 				do_map(reply.ID, reply.File, reply.NReduce, mapf)
 			case rpcargs.RPC_REPLY_DONE:
+				logging.Logger.Info("任务已完成\n", zap.Int("ID", reply.ID))
 				is_done = true
 			case rpcargs.RPC_REPLY_WAIT:
 				time.Sleep(1 * time.Second / 2)
 			}
 		} else {
-			log.Fatalf("rpc send error")
-		}
-		if is_done {
-			break
+			is_done = true
 		}
 	}
-
 }
 
 func do_map(id int, filename string, nReduce int, mapf func(string, string) []KeyValue) {
@@ -132,6 +138,7 @@ func do_map(id int, filename string, nReduce int, mapf func(string, string) []Ke
 		os.Rename(file.Name(), jsonname)
 	}
 
+	logging.Logger.Info("Map任务完成\n", zap.Int("ID", id))
 	call_done(id, rpcargs.RPC_SEND_DONE_MAP)
 
 }
@@ -202,38 +209,46 @@ func do_reduce(id int, nMap int, reducef func(string, []string) string) {
 	}
 
 	os.Rename(ofile.Name(), oname)
+	logging.Logger.Info("Reduce任务完成\n", zap.Int("ID", id))
 	call_done(id, rpcargs.RPC_SEND_DONE_REDUCE)
 }
 
 func call_done(id int, _type int) {
-	// fmt.Printf("done %v %v\n", id, os.Getpid())
-	args := ArgsType{ID: id, Send_type: _type}
+	args := ArgsType{ID: id, Send_type: _type, Rand_Id: nrand()}
 	reply := ReplyType{}
-	ok := CallMaster("Master.RPChandle", args, &reply)
-	if !ok {
-		log.Fatalf("rpc send error")
-	}
+	CallMaster("Master.RPChandle", &args, &reply)
 }
 
 func CallMaster(name string, args interface{}, reply interface{}) bool {
+	restart_time := 0
 	restart := true
-	for restart{
+
+	for restart {
 		restart = false
 		for i := range client {
+			logging.Logger.Debug("Worker 发送请求", zap.Int("服务器", i))
 			err := client[i].Call(name, args, reply)
 			if err != nil {
-				restart = true
+				restart_time++
+				if restart_time < 10 {
+					restart = true
+				} else {
+					logging.Logger.Debug("Master 服务器关闭")
+				}
 				continue
 			}
-			if reply.(ReplyType).Reply_type == rpcargs.RPC_REPLY_WRONG_LEADER {
+			if reply.(*ReplyType).Reply_type == rpcargs.RPC_REPLY_WRONG_LEADER {
+				logging.Logger.Debug("Worker 不是leader")
 				continue
 			}
-			if reply.(ReplyType).Reply_type == rpcargs.RPC_REPLY_TIMEOUT {
+			if reply.(*ReplyType).Reply_type == rpcargs.RPC_REPLY_TIMEOUT {
+				logging.Logger.Debug("Worker 超时")
 				restart = true
 				break
 			}
+			logging.Logger.Debug("Worker 请求成功")
 			return true
 		}
 	}
-	return true
+	return false
 }

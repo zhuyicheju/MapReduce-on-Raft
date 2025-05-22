@@ -1,20 +1,25 @@
 package master
 
 import (
+	"container/heap"
+	"mrrf/logging"
 	"mrrf/rpcargs"
 	"sync/atomic"
-	"container/heap"
+
+	"go.uber.org/zap"
 )
 
 const MS2S = 1000
 
-func (m *Master)handleTask(cmd *Op) *ReplyType{
+func (m *Master) handleTask(cmd *Op) *ReplyType {
 	reply := new(ReplyType)
 
 	if m.reduce_is_done {
 		reply.Reply_type = rpcargs.RPC_REPLY_DONE
-		return nil
+		return reply
 	}
+
+	logging.Logger.Debug("处理请求\n", zap.Int("me", m.me), zap.Int("ArgsType", cmd.Send_type), zap.Int("id", cmd.ID))
 
 	switch cmd.Send_type {
 	case rpcargs.RPC_SEND_DONE_MAP:
@@ -31,11 +36,11 @@ func (m *Master)handleTask(cmd *Op) *ReplyType{
 		}
 	}
 
-	return nil
+	return reply
 }
 
 func DoneMap(m *Master, cmd *Op, reply *ReplyType) {
-	// fmt.Printf("DoneMap %v\n", args.ID)
+	logging.Logger.Info("完成Map任务\n", zap.Int("id", cmd.ID), zap.Int("me", m.me))
 	id := cmd.ID
 	m.map_status_lock[id].Lock()
 	if m.map_status[id] != STATUS_DONE {
@@ -48,7 +53,7 @@ func DoneMap(m *Master, cmd *Op, reply *ReplyType) {
 	m.map_status_lock[id].Unlock()
 }
 func DoneReduce(m *Master, cmd *Op, reply *ReplyType) {
-	// fmt.Printf("DoneReduce %v\n", args.ID)
+	logging.Logger.Info("完成Reduce任务\n", zap.Int("id", cmd.ID), zap.Int("me", m.me))
 	id := cmd.ID
 
 	m.reduce_status_lock[id].Lock()
@@ -57,6 +62,7 @@ func DoneReduce(m *Master, cmd *Op, reply *ReplyType) {
 		m.reduce_status[id] = STATUS_DONE
 		if m.reduce_done_num == int32(m.nReduce) {
 			m.reduce_is_done = true
+			m.Kill()
 		}
 	}
 	m.reduce_status_lock[id].Unlock()
@@ -91,6 +97,7 @@ func RequestMap(m *Master, cmd *Op, reply *ReplyType) {
 			fallthrough
 		case STATUS_ERR:
 			restart = false
+			logging.Logger.Info("分配Map任务\n", zap.Int("id", task.task_id), zap.Int("me", m.me))
 			reply.ID = task.task_id
 			reply.File = m.files[task.task_id]
 
@@ -141,6 +148,7 @@ func RequestReduce(m *Master, cmd *Op, reply *ReplyType) {
 			fallthrough
 		case STATUS_ERR:
 			restart = false
+			logging.Logger.Info("分配Reduce任务\n", zap.Int("id", task.task_id), zap.Int("me", m.me))
 			reply.ID = task.task_id
 
 			m.reduce_status[task.task_id] = STATUS_WORKING

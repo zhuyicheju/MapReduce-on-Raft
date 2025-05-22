@@ -1,34 +1,15 @@
 package raft
 
-//
-// this is an outline of the API that raft must expose to
-// the service (or tester). see comments below for
-// each of these functions for more details.
-//
-// rf = Make(...)
-//   create a new Raft server.
-// rf.Start(command interface{}) (index, term, isleader)
-//   start agreement on a new log entry
-// rf.GetState() (term, isLeader)
-//   ask a Raft for its current term, and whether it thinks it is leader
-// ApplyMsg
-//   each time a new entry is committed to the log, each Raft peer
-//   should send an ApplyMsg to the service (or tester)
-//   in the same server.
-//
-
 import (
-	//	"bytes"
-
-	"fmt"
 	"math/rand"
+	"mrrf/logging"
 	"net/rpc"
 	"sync"
 	"sync/atomic"
+
 	"time"
-	// //	"6.5840/labgob"
-	// "6.5840/labgob"
-	// "6.5840/labrpc"
+
+	"go.uber.org/zap"
 )
 
 type ApplyMsg struct {
@@ -53,21 +34,19 @@ const (
 	LEADER
 )
 
-// A Go object implementing a single Raft peer.
 type Raft struct {
-	mu sync.Mutex // Lock to protect shared access to this peer's state
-	//peers     []*labrpc.ClientEnd // RPC end points of all peers
+	mu        sync.Mutex
 	peers     []string
 	client    []*rpc.Client
-	persister *Persister // Object to hold this peer's persisted state
-	me        int        // this peer's index into peers[]
-	dead      int32      // set by Kill()
+	persister *Persister
+	me        int
+	dead      int32
 	applyCh   chan ApplyMsg
 
 	currentTerm int
 	votedFor    int
 
-	log []LogEntry // need to be implented
+	log []LogEntry
 
 	snapshot      []byte
 	snapshotIndex int
@@ -78,8 +57,6 @@ type Raft struct {
 
 	nextIndex  []int
 	matchIndex []int
-
-	//自己添加
 
 	heartbeat_timestamp int64
 
@@ -142,8 +119,6 @@ type InstallSnapshotReply struct {
 	Success    bool
 }
 
-// return currentTerm and whether this server
-// believes it is the leader.
 func (rf *Raft) GetState() (int, bool) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
@@ -223,6 +198,7 @@ func (rf *Raft) TermIndex(index int) int {
 		return rf.snapshotTerm
 	}
 
+	logging.Logger.Error("错误获取快照日志\n")
 	panic("错误获取快照日志")
 }
 
@@ -254,12 +230,10 @@ func (rf *Raft) Snapshot(index int, snapshot []byte) {
 
 	rf.commitIndex = max(rf.commitIndex, index)
 	rf.persist()
-	// fmt.Printf("Server %v: Snapshot %v %v %v\n", rf.me, index, len(rf.log)-1, rf.snapshotTerm)
 }
 
 func (rf *Raft) ParallelCommit(index int, log []LogEntry) {
 	for i := range log {
-		// fmt.Printf("server %v :提交日志%v\n", rf.me, i+index)
 		rf.applyCh <- ApplyMsg{CommandValid: true, Command: log[i].Log, CommandIndex: i + index}
 	}
 }
@@ -271,7 +245,6 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
-	fmt.Printf("Server %v: AppendEntries \n", rf.me)
 	currentTerm := rf.currentTerm
 	reply.Term = currentTerm
 	reply.Me = rf.me
@@ -281,8 +254,6 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 	if args.Term < currentTerm {
 		//任期过低
 		reply.Success = false
-		// fmt.Printf("Serve %v: 任期过低AppendEntries log %v commit %v\n", rf.me, rf.FakeIdx2TrueIdx(len(rf.log)-1), rf.commitIndex)
-
 		return nil
 	}
 	rf.heartbeat_timestamp = time.Now().UnixMilli()
@@ -298,7 +269,6 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 		if len(rf.log) != 1 && args.PrevLogIndex <= rf.FakeIdx2TrueIdx(len(rf.log)-1) {
 			rf.log = rf.log[:rf.TrueIdx2FakeIdx(args.PrevLogIndex)]
 		}
-		// fmt.Printf("Server %v: 日志不匹配 %v term: %v %v\n", rf.me, args.PrevLogIndex, args.PrevLogTerm, rf.snapshotTerm)
 		reply.ConflictIndex = min(args.PrevLogIndex, rf.FakeIdx2TrueIdx(len(rf.log)))
 		if args.PrevLogIndex >= rf.FakeIdx2TrueIdx(len(rf.log)) {
 			reply.ConflictIndex = rf.FakeIdx2TrueIdx(len(rf.log))
@@ -336,14 +306,10 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 	reply.Append_num = len(args.Entries)
 	reply.Success = true
 	if args.LeaderCommit > rf.commitIndex {
-		// for i := rf.commitIndex + 1; i <= min(args.LeaderCommit, len(rf.log)-1); i++ {
-		// 	rf.applyCh <- ApplyMsg{CommandValid: true, Command: rf.log[i].Log, CommandIndex: i}
-		// }
 		commitlog := rf.log[rf.TrueIdx2FakeIdx(rf.commitIndex+1) : min(rf.TrueIdx2FakeIdx(args.LeaderCommit), len(rf.log)-1)+1]
 		go rf.ParallelCommit(rf.commitIndex+1, commitlog)
 		rf.commitIndex = min(args.LeaderCommit, rf.FakeIdx2TrueIdx(len(rf.log)-1))
 	}
-	// fmt.Printf("Serve %v: 成功AppendEntries log %v commit %v\n", rf.me, rf.FakeIdx2TrueIdx(len(rf.log)-1), rf.commitIndex)
 	return nil
 }
 
@@ -352,10 +318,7 @@ func (rf *Raft) InstallSnapshot(args *InstallSnapshotArgs, reply *InstallSnapsho
 		return nil
 	}
 
-	// fmt.Printf("Server %v: 尝试锁installsnapshot\n", rf.me)
 	rf.mu.Lock()
-
-	// fmt.Printf("Server %v: installsnapshot\n", rf.me)
 
 	if args.Term < rf.currentTerm || args.LastIncludedIndex <= rf.commitIndex {
 		rf.mu.Unlock()
@@ -373,7 +336,6 @@ func (rf *Raft) InstallSnapshot(args *InstallSnapshotArgs, reply *InstallSnapsho
 
 	rf.heartbeat_timestamp = time.Now().UnixMilli()
 
-	// fmt.Printf("server %v :提交快照%v\n", rf.me, args.LastIncludedIndex)
 	rf.applyCh <- ApplyMsg{SnapshotValid: true, Snapshot: args.Data, SnapshotTerm: args.LastIncludedTerm, SnapshotIndex: args.LastIncludedIndex}
 
 	rf.log = []LogEntry{{Term: 0}}
@@ -383,7 +345,6 @@ func (rf *Raft) InstallSnapshot(args *InstallSnapshotArgs, reply *InstallSnapsho
 
 	rf.commitIndex = max(rf.commitIndex, args.LastIncludedIndex)
 	rf.persist()
-	// fmt.Printf("Server %v: Snapshot %v %v %v\n", rf.me, args.LastIncludedIndex, len(rf.log)-1, rf.snapshotTerm)
 
 	rf.mu.Unlock()
 	//在无锁调用
@@ -404,14 +365,12 @@ func (rf *Raft) PreRequestVote(args *RequestVoteArgs, reply *RequestVoteReply) e
 	if args.Term < currentTerm || (args.Term == currentTerm && rf.votedFor != -1 && rf.votedFor != args.CandidatedId) ||
 		args.LastLogTerm < rf.LastLogTerm() ||
 		(args.LastLogTerm == rf.LastLogTerm() && rf.TrueIdx2FakeIdx(args.LastLogIndex) < len(rf.log)-1) {
-		// fmt.Printf("Serve %v: RequestVote %v %v %v %v %v\n", rf.me, args.CandidatedId, args.Term, rf.currentTerm, reply.VoteGranted, rf.votedFor)
 		reply.VoteGranted = false
 		return nil
 	}
 
 	rf.heartbeat_timestamp = time.Now().UnixMilli()
 	reply.VoteGranted = true
-	// fmt.Printf("Serve %v: RequestVote %v %v %v %v %v\n", rf.me, args.CandidatedId, args.Term, rf.currentTerm, reply.VoteGranted, rf.votedFor)
 	return nil
 }
 
@@ -424,13 +383,10 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) erro
 
 	defer rf.mu.Unlock()
 
-	fmt.Printf("Serve %v: RequestVote\n", rf.me)
-
 	reply.Term = rf.currentTerm
 
 	if args.Term > rf.currentTerm {
 		rf.ChangeState(args.Term, -1, FOLLOWER)
-		//rf.heartbeat_timestamp = time.Now().UnixMilli()
 	}
 
 	if args.Term < rf.currentTerm ||
@@ -438,7 +394,6 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) erro
 		args.LastLogTerm < rf.LastLogTerm() ||
 		(args.LastLogTerm == rf.LastLogTerm() && rf.TrueIdx2FakeIdx(args.LastLogIndex) < len(rf.log)-1) {
 
-		// fmt.Printf("Serve %v: RequestVote %v %v %v %v %v\n", rf.me, args.CandidatedId, args.Term, rf.currentTerm, reply.VoteGranted, rf.votedFor)
 		reply.VoteGranted = false
 		return nil
 	}
@@ -446,7 +401,6 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) erro
 	rf.heartbeat_timestamp = time.Now().UnixMilli()
 	reply.VoteGranted = true
 	rf.ChangeState(rf.currentTerm, args.CandidatedId, FOLLOWER)
-	//fmt.Printf("Serve %v: RequestVote %v %v %v %v %v\n", rf.me, args.CandidatedId, args.Term, rf.currentTerm, reply.VoteGranted, rf.votedFor)
 	return nil
 }
 
@@ -454,7 +408,6 @@ func (rf *Raft) ReceiveReply(stop chan struct{}, entries_replyCh chan *AppendEnt
 	for !rf.killed() {
 		select {
 		case <-stop:
-			// fmt.Printf("关闭done\n")
 			rf.rw.Lock()
 			*done = true
 			close(entries_replyCh)
@@ -484,10 +437,8 @@ func (rf *Raft) ReceiveReply(stop chan struct{}, entries_replyCh chan *AppendEnt
 			rf.mu.Unlock()
 
 		case reply := <-entries_replyCh:
-			// fmt.Printf("Trylock %v\n", reply.Me)
 			rf.mu.Lock()
 
-			// fmt.Printf("收到回复 %v\n", reply.Me)
 			//reply类型 success term
 			//正常成功   true    ==
 			//任期过期   false   >
@@ -539,26 +490,18 @@ func (rf *Raft) ReceiveReply(stop chan struct{}, entries_replyCh chan *AppendEnt
 				rf.nextIndex[reply.Me] = reply.PrevLogIndex + reply.Append_num + 1
 				rf.matchIndex[reply.Me] = rf.nextIndex[reply.Me] - 1
 				if reply.Append_num != 0 {
-					// fmt.Printf("%v 更新match %v \n", reply.Me, rf.matchIndex[reply.Me])
 					rf.median_tracker.Add(reply.Me, rf.matchIndex[reply.Me])
 					median := rf.median_tracker.GetMedian()
-					// fmt.Printf("median %v \n", median)
-					// fmt.Printf("%v %v %v %v %v", median, rf.currentTerm, rf.TermIndex(median), rf.TrueIdx2FakeIdx(median), rf.log[rf.TrueIdx2FakeIdx(median)].Term)
 
 					if rf.TermIndex(median) == rf.currentTerm && median > rf.commitIndex {
-						// fmt.Printf("Server %v: 提交日志", rf.me)
 						commitLog := rf.log[rf.TrueIdx2FakeIdx(rf.commitIndex+1):rf.TrueIdx2FakeIdx(median+1)]
 						go rf.ParallelCommit(rf.commitIndex+1, commitLog)
 
 						rf.commitIndex = median
 					}
 				}
-
-				//更新matchindex
 			}
-
 			rf.mu.Unlock()
-
 		}
 	}
 }
@@ -574,18 +517,16 @@ func (rf *Raft) Start(command interface{}) (int, int, bool) {
 	if isLeader {
 		rf.log = append(rf.log, LogEntry{Term: rf.currentTerm, Log: command})
 		rf.persist()
-
-		// fmt.Printf("%v 更新match %v \n", rf.me, rf.FakeIdx2TrueIdx(len(rf.log)-1))
 		rf.median_tracker.Add(rf.me, rf.FakeIdx2TrueIdx(len(rf.log)-1))
-		// fmt.Printf("Server %v: Start 是否leader %v, Term %v, Index %v\n", rf.me, rf.state == LEADER, rf.currentTerm, rf.FakeIdx2TrueIdx(len(rf.log))-1)
-
 	}
-	//
 	return index, term, isLeader
 }
 
 func Leader(rf *Raft) {
 	//进入时持有锁
+
+	logging.Logger.Debug("进入Leader\n", zap.Int("me", rf.me))
+
 	rf.state = LEADER
 
 	//no-op机制
@@ -595,7 +536,6 @@ func Leader(rf *Raft) {
 
 	peers_num := len(rf.peers)
 
-	// fmt.Printf("%v 更新match %v \n", rf.me, rf.FakeIdx2TrueIdx(len(rf.log)-1))
 	rf.median_tracker.Add(rf.me, rf.FakeIdx2TrueIdx(len(rf.log)-1))
 
 	for i := range rf.matchIndex {
@@ -617,21 +557,17 @@ func Leader(rf *Raft) {
 				continue
 			}
 
-			//func是按引用捕获
-
 			if rf.nextIndex[i] > rf.snapshotIndex {
 				prevlogindex := rf.nextIndex[i] - 1
 				term := rf.currentTerm
 				prevlogterm := rf.TermIndex(prevlogindex)
 				leadercommit := rf.commitIndex
 				entries := make([]LogEntry, 0)
-				// fmt.Printf("%v %v %v \n", len(rf.log)-1, rf.FakeIdx2TrueIdx(len(rf.log)-1), rf.nextIndex[i])
 				if rf.FakeIdx2TrueIdx(len(rf.log)-1) >= rf.nextIndex[i] {
 					entries = append(entries, rf.log[rf.TrueIdx2FakeIdx(rf.nextIndex[i]):]...)
 				}
 
 				go func(server int) {
-					fmt.Printf("Server %v: 向%v发送心跳 prev %v len:%v commit %v\n", rf.me, server, rf.nextIndex[server]-1, len(entries), rf.commitIndex)
 					args := AppendEntriesArgs{Term: term, LeaderId: rf.me,
 						PrevLogIndex: prevlogindex, PrevLogTerm: prevlogterm,
 						LeaderCommit: leadercommit,
@@ -639,15 +575,15 @@ func Leader(rf *Raft) {
 					reply := AppendEntriesReply{}
 					ok := RPCCall(rf, server, "Raft.AppendEntries", &args, &reply)
 					if ok {
-						// fmt.Printf("收到回复 %v\n", server)
+						// // // fmt.Printf("收到回复 %v\n", server)
 						msg := &reply
-						// fmt.Printf("获取读锁 %v\n", server)
+						// // // fmt.Printf("获取读锁 %v\n", server)
 						rf.rw.RLock()
 						if !done {
-							// fmt.Printf("加入管道 %v\n", server)
+							// // // fmt.Printf("加入管道 %v\n", server)
 							entries_replyCh <- msg
 						} else {
-							// fmt.Printf("管道已关闭 %v\n", server)
+							// // // fmt.Printf("管道已关闭 %v\n", server)
 						}
 						rf.rw.RUnlock()
 					}
@@ -655,19 +591,19 @@ func Leader(rf *Raft) {
 				}(i)
 			} else {
 				go func(server int) {
-					// fmt.Printf("Server %v: 向%v发送快照 prev %v last: %v Term %v\n", rf.me, server, rf.nextIndex[server]-1, rf.snapshotIndex, rf.snapshotTerm)
+					// // // fmt.Printf("Server %v: 向%v发送快照 prev %v last: %v Term %v\n", rf.me, server, rf.nextIndex[server]-1, rf.snapshotIndex, rf.snapshotTerm)
 					args := InstallSnapshotArgs{Term: rf.currentTerm, LeaderId: rf.me,
 						LastIncludedIndex: rf.snapshotIndex, Data: rf.snapshot, LastIncludedTerm: rf.snapshotTerm}
 					reply := InstallSnapshotReply{}
 					ok := RPCCall(rf, server, "Raft.InstallSnapshot", &args, &reply)
 
 					if ok {
-						// fmt.Printf("收到回复 %v", server)
+						// // // fmt.Printf("收到回复 %v", server)
 						msg := &reply
 
 						rf.rw.RLock()
 						if !done {
-							// fmt.Printf("加入管道 %v", server)
+							// // // fmt.Printf("加入管道 %v", server)
 							snapshot_replyCh <- msg
 						}
 						rf.rw.RUnlock()
@@ -677,11 +613,10 @@ func Leader(rf *Raft) {
 			}
 		}
 
-		// fmt.Printf("释放锁\n")
 		rf.mu.Unlock()
 
 		ms := 50
-		//每秒<=10次beat
+
 		time.Sleep(time.Duration(ms) * time.Millisecond) //选举超时时间
 
 		rf.mu.Lock()
@@ -711,7 +646,7 @@ func Prevote(rf *Raft) bool {
 			continue
 		}
 
-		// fmt.Printf("Server %v: 向%v发送投票\n", rf.me, i)
+		// // // fmt.Printf("Server %v: 向%v发送投票\n", rf.me, i)
 		go func(server int) {
 			reply := RequestVoteReply{}
 			ok := RPCCall(rf, server, "Raft.PreRequestVote", &args, &reply)
@@ -795,10 +730,8 @@ func Candidate(rf *Raft) {
 				continue
 			}
 
-			fmt.Printf("Server %v: 向%v发送投票\n", rf.me, i)
 			go func(server int) {
 				reply := RequestVoteReply{}
-				// ok := rf.peers[server].Call("Raft.RequestVote", &args, &reply)
 				ok := RPCCall(rf, server, "Raft.RequestVote", &args, &reply)
 				var msg *RequestVoteReply
 				if ok {
@@ -839,7 +772,6 @@ func Candidate(rf *Raft) {
 				if reply.VoteGranted {
 					granted_cnt++
 					if granted_cnt >= (peers_num)/2+1 {
-						fmt.Printf("Server %v: 选举成功，进入leader\n", rf.me)
 						Leader(rf)
 						return //若是leader被打为follower直接return到tick
 					}
@@ -860,14 +792,11 @@ func Candidate(rf *Raft) {
 
 func (rf *Raft) ticker() {
 	for !rf.killed() {
-		// pause for a random amount of time between 50 and 350
-		// milliseconds.
 		ms := 300 + (rand.Int63() % 200)
 		time.Sleep(time.Duration(ms) * time.Millisecond)
 
 		rf.mu.Lock()
 		if time.Since(time.UnixMilli(rf.heartbeat_timestamp)).Milliseconds() > ms {
-			fmt.Printf("Server %v: 等待超时，开始选举\n", rf.me)
 			//超时
 			//自下向上转换不需要手动添加状态转换
 			Candidate(rf)
@@ -878,7 +807,6 @@ func (rf *Raft) ticker() {
 
 func Make(peers []string, me int,
 	persister *Persister, applyCh chan ApplyMsg) *Raft {
-	fmt.Printf("创建实例 %v\n", me)
 	rf := &Raft{}
 	rf.peers = peers
 	rf.client = make([]*rpc.Client, len(rf.peers))
@@ -891,15 +819,13 @@ func Make(peers []string, me int,
 
 	rf.median_tracker = NewMedianTracker(make([]int, len(rf.peers)))
 
-	// rf.heartbeat_timestamp = time.Now().UnixMilli()
-
 	rf.nextIndex = make([]int, len(rf.peers))
 	rf.matchIndex = make([]int, len(rf.peers))
 
-	// initialize from state persisted before a crash
 	// rf.readPersist(persister.ReadRaftState())
 	// rf.snapshot = rf.persister.ReadSnapshot()
 
+	logging.Logger.Debug("Raft实体构建\n", zap.Int("me", me))
 	return rf
 }
 
@@ -909,20 +835,23 @@ func (rf *Raft) Open() {
 			continue
 		}
 		client, err := rpc.Dial("tcp", addr)
-		rf.client[i] = client
 		if err != nil {
-			panic("连接失败")
+			logging.Logger.Error("产生错误\n", zap.Error(err))
+			panic(err)
 		}
+		rf.client[i] = client
 	}
 
-	// start ticker goroutine to start elections
 	go rf.ticker()
 }
 func (rf *Raft) Kill() {
 	atomic.StoreInt32(&rf.dead, 1)
 
 	rf.mu.Lock()
-	for _, client := range rf.client {
+	for i, client := range rf.client {
+		if i == rf.me {
+			continue
+		}
 		client.Close()
 	}
 	rf.mu.Unlock()
@@ -945,5 +874,9 @@ func RPCCall(rf *Raft, server int, name string, args interface{}, reply interfac
 		panic("RPC自己")
 	}
 	err := rf.client[server].Call(name, args, reply)
+	if err != nil {
+		logging.Logger.Error("产生错误\n", zap.Error(err))
+		panic(err)
+	}
 	return err == nil
 }
